@@ -538,13 +538,18 @@ kbd {
       px[i] = v; px[i + 1] = v - 2; px[i + 2] = v - 6; px[i + 3] = 255;
     }
     g.putImageData(img, 0, 0);
-    const cx = c.width / 2, cy = c.height / 2;
-    const grad = g.createRadialGradient(cx, cy, Math.min(cx, cy) * 0.5, cx, cy, Math.max(cx, cy) * 1.25);
+    // The vignette is separate: grain scrolls with the paper, the vignette stays on the screen.
+    const v = document.createElement('canvas');
+    v.width = c.width;
+    v.height = c.height;
+    const vg = v.getContext('2d');
+    const cx = v.width / 2, cy = v.height / 2;
+    const grad = vg.createRadialGradient(cx, cy, Math.min(cx, cy) * 0.5, cx, cy, Math.max(cx, cy) * 1.25);
     grad.addColorStop(0, 'rgba(255,255,255,0)');
     grad.addColorStop(1, VIGNETTE);
-    g.fillStyle = grad;
-    g.fillRect(0, 0, c.width, c.height);
-    return c;
+    vg.fillStyle = grad;
+    vg.fillRect(0, 0, v.width, v.height);
+    return { noise: c, vignette: v };
   }
 
   // ---------- state ----------
@@ -1074,10 +1079,12 @@ kbd {
     for (const layer of layers) {
       ctx.globalAlpha = layer.a;
       ctx.beginPath();
-      for (let sx = -10; sx <= viewW + 10; sx += 14) {
-        const px = cam * layer.p + sx;
+      // Sample on a grid fixed in parallax space so the hills slide instead of reshaping every frame.
+      const shift = cam * (1 - layer.p);
+      const firstPx = Math.floor((cam * layer.p - 14) / 14) * 14;
+      for (let px = firstPx; px <= cam * layer.p + viewW + 28; px += 14) {
         const y = layer.base + 22 * Math.sin(px * 0.0045) + 12 * Math.sin(px * 0.0112 + 1.7);
-        if (sx === -10) ctx.moveTo(cam + sx, y); else ctx.lineTo(cam + sx, y);
+        if (px === firstPx) ctx.moveTo(px + shift, y); else ctx.lineTo(px + shift, y);
       }
       ctx.stroke();
     }
@@ -1331,9 +1338,12 @@ kbd {
       return topEdge + (blobTopY(x, t) - topEdge) * fade;
     };
     ctx.moveTo(back, topAt(back));
-    for (let x = back; x < frontTopX; x += 12) ctx.lineTo(x, topAt(x));
-    for (let y = topEdge; y <= bottomEdge; y += 5) ctx.lineTo(blobFront(y, t), y);
-    for (let x = frontBottomX; x > back; x -= 12) ctx.lineTo(x, blobBottomY(x, t));
+    // Contours sample on world-fixed grids (not screen- or band-relative) so the outline doesn't shimmer.
+    for (let x = Math.floor(back / 12) * 12 + 12; x < frontTopX; x += 12) ctx.lineTo(x, topAt(x));
+    ctx.lineTo(frontTopX, topEdge);
+    for (let y = Math.ceil(topEdge / 5) * 5; y < bottomEdge; y += 5) ctx.lineTo(blobFront(y, t), y);
+    ctx.lineTo(frontBottomX, bottomEdge);
+    for (let x = Math.floor(frontBottomX / 12) * 12; x > back; x -= 12) ctx.lineTo(x, blobBottomY(x, t));
     ctx.lineTo(back, blobBottomY(back, t));
     ctx.closePath();
     ctx.fill();
@@ -1490,7 +1500,11 @@ kbd {
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.globalCompositeOperation = 'multiply';
-    ctx.drawImage(grain, 0, 0, cssW, cssH);
+    // Paper grain is tiled horizontally and scrolls with the world, so content and paper move together.
+    const grainX = -(((cam * scale) % cssW) + cssW) % cssW;
+    ctx.drawImage(grain.noise, grainX, 0, cssW, cssH);
+    ctx.drawImage(grain.noise, grainX + cssW, 0, cssW, cssH);
+    ctx.drawImage(grain.vignette, 0, 0, cssW, cssH); // multiply too, so it darkens paper but never greys the ink
     ctx.globalCompositeOperation = 'source-over';
     if (state === 'play') drawDanger();
     if (state !== 'title') { drawHud(t); drawFlyers(); }
