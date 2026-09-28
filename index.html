@@ -553,6 +553,8 @@ kbd {
   let segments = [], strokes = [], decor = [], pickups = [], particles = [], tendrils = [], flyers = [];
   let shake = 0, danger = 0, barPulse = 0, drawnThisFrame = 0, animT = 0;
   let dryAlert = 0, lastDrySound = 0, dryMarks = [];
+  // Hidden perf overlay, toggled with F. Stats are averaged over half-second windows.
+  const perf = { visible: false, frames: 0, windowStart: 0, updateMs: 0, renderMs: 0, fps: 0, avgUpdate: 0, avgRender: 0, worstFrame: 0, worst: 0 };
   let drop, blob, cam, gen;
   let pen = null, pointer = null;
   // Personal ranking: top RANKING_SIZE runs, kept only in this browser's localStorage.
@@ -1492,6 +1494,42 @@ kbd {
     ctx.globalCompositeOperation = 'source-over';
     if (state === 'play') drawDanger();
     if (state !== 'title') { drawHud(t); drawFlyers(); }
+    if (perf.visible) drawPerf();
+  }
+
+  function drawPerf() {
+    const lines = [
+      `${perf.fps.toFixed(0)} fps  worst ${perf.worst.toFixed(1)} ms`,
+      `update ${perf.avgUpdate.toFixed(2)} ms  render ${perf.avgRender.toFixed(2)} ms`,
+      `segments ${segments.length}  strokes ${strokes.length}  decor ${decor.length}`,
+      `particles ${particles.length}  pickups ${pickups.length}  drips ${blob.drips.length}`,
+      `canvas ${canvas.width}×${canvas.height} @${dpr}x`,
+    ];
+    ctx.font = '12px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    const x = 20, y = 70;
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(x - 6, y - 4, 330, lines.length * 16 + 8);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = INK;
+    lines.forEach((line, i) => ctx.fillText(line, x, y + i * 16));
+  }
+
+  function trackPerf(now, frameMs, updateMs, renderMs) {
+    perf.frames++;
+    perf.updateMs += updateMs;
+    perf.renderMs += renderMs;
+    perf.worstFrame = Math.max(perf.worstFrame, frameMs);
+    const elapsed = now - perf.windowStart;
+    if (elapsed >= 500) {
+      perf.fps = (perf.frames * 1000) / elapsed;
+      perf.avgUpdate = perf.updateMs / perf.frames;
+      perf.avgRender = perf.renderMs / perf.frames;
+      perf.worst = perf.worstFrame;
+      Object.assign(perf, { frames: 0, updateMs: 0, renderMs: 0, worstFrame: 0, windowStart: now });
+    }
   }
 
   // ---------- flow ----------
@@ -1565,16 +1603,21 @@ kbd {
     if (isPauseKey) togglePause();
     else if (isRestartKey && canRestart) restart();
     else if (key === 'm') muteBtn.click();
+    else if (key === 'f') perf.visible = !perf.visible;
   });
 
   let last = performance.now();
   function frame(now) {
-    const dt = Math.min(0.033, (now - last) / 1000);
+    const frameMs = now - last;
+    const dt = Math.min(0.033, frameMs / 1000);
     last = now;
     animT = now / 1000;
+    const t0 = performance.now();
     if (state === 'play') update(dt);
     else if (state === 'dead') updateDead(dt);
+    const t1 = performance.now();
     render(animT);
+    trackPerf(now, frameMs, t1 - t0, performance.now() - t1);
     requestAnimationFrame(frame);
   }
 
