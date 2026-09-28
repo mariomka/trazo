@@ -3,6 +3,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Trazo: an endless ink-on-paper game. Draw the ground for a rolling ink drop while the blot chases you.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Trazo">
+<meta name="theme-color" content="#e9e3d6">
 <style>body { margin: 0; } [hidden] { display: none !important; }</style>
 <title>Trazo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -89,10 +94,14 @@ body {
 }
 .overlay button:hover { background: var(--ink); color: var(--paper); }
 .overlay button:focus-visible { outline: 2px dashed var(--ink); outline-offset: 5px; }
-.mute {
+.corner {
   position: absolute;
   right: 12px;
   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  gap: 10px;
+}
+.mute {
   padding: 6px;
   font: italic 16px var(--font-text);
   color: var(--graphite);
@@ -100,7 +109,8 @@ body {
   border: none;
   cursor: pointer;
 }
-.mute[aria-pressed="true"] { text-decoration: line-through; }
+.mute:hover { color: var(--ink); }
+#mute[aria-pressed="true"] { text-decoration: line-through; }
 .mute:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
 .controls {
   position: absolute;
@@ -122,6 +132,18 @@ body {
 }
 .controls button:hover { color: var(--ink); }
 .controls button:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
+/* Touch screens have no keyboard: drop the shortcut hints. */
+@media (pointer: coarse) { kbd { display: none; } }
+/* Phones in landscape: keep the overlay inside ~390px of height. */
+@media (max-height: 500px) {
+  .overlay { gap: 8px; }
+  .overlay h1 { font-size: 64px; }
+  .overlay h1.death { font-size: 42px; }
+  .overlay p { font-size: 15px; }
+  .overlay .score { font-size: 36px; }
+  .ranking .dist { font-size: 20px; }
+  .overlay button { margin-top: 2px; font-size: 28px; }
+}
 kbd {
   padding: 0 5px;
   font: 12px/1.5 var(--font-text);
@@ -146,7 +168,10 @@ kbd {
     <p class="sub" id="hint" hidden>Plays best with your phone in landscape.</p>
     <button id="start" type="button">Start</button>
   </div>
-  <button id="mute" class="mute" type="button" aria-pressed="false">sound</button>
+  <div class="corner">
+    <button id="fullscreen" class="mute" type="button" aria-pressed="false" hidden><span id="fullscreenLabel">fullscreen</span> <kbd>F</kbd></button>
+    <button id="mute" class="mute" type="button" aria-pressed="false">sound</button>
+  </div>
   <div class="controls" id="controls" hidden>
     <button id="pauseBtn" type="button"><span id="pauseLabel">pause</span> <kbd>P</kbd></button>
     <button id="restartBtn" type="button"><span id="restartLabel">restart</span> <kbd>R</kbd></button>
@@ -159,6 +184,8 @@ kbd {
   const C = {
     WORLD_H: 600,
     MIN_VIEW_W: 760,
+    PHONE_VIEW_H: 420,
+    CAM_Y_FOLLOW: 3,
     CAM_ANCHOR: 0.36,
     GRAVITY: 1000,
     WALK_ACCEL: 260,
@@ -213,6 +240,7 @@ kbd {
   const startBtn = document.getElementById('start');
   const hintEl = document.getElementById('hint');
   const muteBtn = document.getElementById('mute');
+  const fullscreenBtn = document.getElementById('fullscreen');
   const controlsEl = document.getElementById('controls');
   const pauseBtn = document.getElementById('pauseBtn');
   const restartBtn = document.getElementById('restartBtn');
@@ -220,6 +248,7 @@ kbd {
   // ---------- i18n: top 10 internet languages, picked from the browser's Accept-Language (navigator.languages) ----------
   const STRINGS = {
     en: {
+      fullscreen: 'fullscreen',
       pauseBtn: 'pause', restartBtn: 'restart',
       ranking: 'Your best runs',
       line1: 'Draw the ground near the drop. Downhill it gains speed, uphill it loses it.',
@@ -233,6 +262,7 @@ kbd {
       aria: 'Trazo: draw the ground for an ink drop',
     },
     zh: {
+      fullscreen: '全屏',
       pauseBtn: '暂停', restartBtn: '重来',
       ranking: '你的最佳成绩',
       line1: '在墨滴附近画出地面。下坡加速，上坡减速。',
@@ -246,6 +276,7 @@ kbd {
       aria: 'Trazo：为墨滴画出地面',
     },
     es: {
+      fullscreen: 'pantalla completa',
       pauseBtn: 'pausa', restartBtn: 'reiniciar',
       ranking: 'Tus mejores partidas',
       line1: 'Dibuja el suelo cerca de la gota. Cuesta abajo gana velocidad, cuesta arriba la pierde.',
@@ -259,6 +290,7 @@ kbd {
       aria: 'Trazo: dibuja el suelo para la gota de tinta',
     },
     ar: {
+      fullscreen: 'ملء الشاشة',
       pauseBtn: 'إيقاف', restartBtn: 'إعادة',
       ranking: 'أفضل جولاتك',
       line1: 'ارسم الأرض قرب القطرة. تزداد سرعتها في النزول وتقل في الصعود.',
@@ -272,6 +304,7 @@ kbd {
       aria: 'Trazo: ارسم الأرض لقطرة الحبر',
     },
     pt: {
+      fullscreen: 'tela cheia',
       pauseBtn: 'pausar', restartBtn: 'reiniciar',
       ranking: 'Suas melhores partidas',
       line1: 'Desenhe o chão perto da gota. Na descida ela ganha velocidade, na subida perde.',
@@ -285,6 +318,7 @@ kbd {
       aria: 'Trazo: desenhe o chão para uma gota de tinta',
     },
     id: {
+      fullscreen: 'layar penuh',
       pauseBtn: 'jeda', restartBtn: 'ulang',
       ranking: 'Permainan terbaikmu',
       line1: 'Gambar tanah di dekat tetesan. Menurun makin cepat, menanjak makin lambat.',
@@ -298,6 +332,7 @@ kbd {
       aria: 'Trazo: gambar tanah untuk tetesan tinta',
     },
     fr: {
+      fullscreen: 'plein écran',
       pauseBtn: 'pause', restartBtn: 'recommencer',
       ranking: 'Tes meilleures parties',
       line1: 'Dessine le sol près de la goutte. En descente elle accélère, en montée elle ralentit.',
@@ -311,6 +346,7 @@ kbd {
       aria: 'Trazo : dessine le sol pour une goutte d’encre',
     },
     ja: {
+      fullscreen: '全画面',
       pauseBtn: '一時停止', restartBtn: 'やり直す',
       ranking: 'あなたのベスト記録',
       line1: 'しずくの近くに地面を描こう。下り坂で加速し、上り坂で減速する。',
@@ -324,6 +360,7 @@ kbd {
       aria: 'Trazo：インクのしずくのために地面を描く',
     },
     ru: {
+      fullscreen: 'полный экран',
       pauseBtn: 'пауза', restartBtn: 'заново',
       ranking: 'Твои лучшие забеги',
       line1: 'Рисуй землю рядом с каплей. Под гору она разгоняется, в гору замедляется.',
@@ -337,6 +374,7 @@ kbd {
       aria: 'Trazo: рисуй землю для чернильной капли',
     },
     de: {
+      fullscreen: 'Vollbild',
       pauseBtn: 'Pause', restartBtn: 'Neustart',
       ranking: 'Deine besten Läufe',
       line1: 'Zeichne den Boden nahe am Tropfen. Bergab wird er schneller, bergauf langsamer.',
@@ -383,6 +421,7 @@ kbd {
   document.getElementById('rankingTitle').textContent = L.ranking;
   document.getElementById('pauseLabel').textContent = L.pauseBtn;
   document.getElementById('restartLabel').textContent = L.restartBtn;
+  document.getElementById('fullscreenLabel').textContent = L.fullscreen;
   document.getElementById('start').textContent = L.start;
   document.getElementById('mute').textContent = L.sound;
   document.getElementById('game').setAttribute('aria-label', L.aria);
@@ -507,6 +546,18 @@ kbd {
   // ---------- viewport ----------
   let dpr = 1, cssW = 0, cssH = 0, scale = 1, offY = 0, viewW = 0, grain = null;
   let visTop = 0, visBottom = C.WORLD_H;
+  // camY is the world y at the top of the screen. When the whole world height fits, it just centers it;
+  // on short screens (phones in landscape) it follows the drop vertically.
+  let camY = 0, viewH = C.WORLD_H, followY = false;
+
+  function camYTarget() {
+    return clamp(drop.y - viewH * 0.55, -30, C.WORLD_H + 40 - viewH);
+  }
+  function applyCamY() {
+    offY = -camY * scale;
+    visTop = camY;
+    visBottom = camY + viewH;
+  }
 
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -515,14 +566,17 @@ kbd {
     canvas.width = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
     const isPortrait = cssW < cssH;
-    // Portrait phones get a narrower world view so the drop is not microscopic.
+    const isPhone = Math.min(cssW, cssH) < 520;
+    // Portrait phones get a narrower world view; landscape phones a shorter one, so the drop isn't microscopic.
     const minViewW = isPortrait ? 520 : C.MIN_VIEW_W;
-    scale = Math.min(cssH / C.WORLD_H, cssW / minViewW);
+    const minViewH = isPhone && !isPortrait ? C.PHONE_VIEW_H : C.WORLD_H;
+    scale = Math.min(cssH / minViewH, cssW / minViewW);
     hintEl.hidden = !(isPortrait && state === 'title');
-    offY = (cssH - C.WORLD_H * scale) / 2;
     viewW = cssW / scale;
-    visTop = -offY / scale;
-    visBottom = (cssH - offY) / scale;
+    viewH = cssH / scale;
+    followY = viewH < C.WORLD_H - 1;
+    camY = followY && drop ? camYTarget() : -(viewH - C.WORLD_H) / 2;
+    applyCamY();
     grain = makeGrain(cssW, cssH);
   }
 
@@ -558,7 +612,7 @@ kbd {
   let segments = [], strokes = [], decor = [], pickups = [], particles = [], tendrils = [], flyers = [];
   let shake = 0, danger = 0, barPulse = 0, drawnThisFrame = 0, animT = 0;
   let dryAlert = 0, lastDrySound = 0, dryMarks = [];
-  // Hidden perf overlay, toggled with F. Stats are averaged over half-second windows.
+  // Hidden perf overlay, toggled with D. Stats are averaged over half-second windows.
   const perf = { visible: false, frames: 0, windowStart: 0, updateMs: 0, renderMs: 0, fps: 0, avgUpdate: 0, avgRender: 0, worstFrame: 0, worst: 0 };
   let drop, blob, cam, gen;
   let pen = null, pointer = null;
@@ -626,6 +680,7 @@ kbd {
     drop = { x: 0, y: C.START_Y - C.DROP_R - 1, vx: 60, vy: 0, grounded: false, gnx: 0, gny: -1, tilt: 0, impact: 0, squash: 0, squashV: 0, tip: 0, tipV: 0, alive: true };
     blob = { x: -520, feed: 0, pace: 0, cy: C.START_Y, drips: [], gulpAcc: 0 };
     cam = drop.x - viewW * C.CAM_ANCHOR;
+    if (followY) { camY = camYTarget(); applyCamY(); }
     gen = { x: C.START_END, inkX: 460 };
     tendrils = Array.from({ length: 6 }, () => ({ u: rand(-0.8, 0.8), len: rand(25, 70), phase: rand(0, 6.28) }));
 
@@ -974,6 +1029,10 @@ kbd {
 
     const target = drop.x - viewW * C.CAM_ANCHOR;
     cam += (target - cam) * Math.min(1, dt * 4);
+    if (followY) {
+      camY += (camYTarget() - camY) * Math.min(1, dt * C.CAM_Y_FOLLOW);
+      applyCamY();
+    }
 
     // Holding still keeps drawing as the page scrolls under the pen.
     if (pen && pointer) addPenPoint(toWorld(pointer));
@@ -1302,13 +1361,18 @@ kbd {
   }
 
   function drawRadius() {
+    // Sized in screen pixels (divide by scale) so it stays readable on small screens.
+    const isEmpty = ink <= 0;
     ctx.save();
-    ctx.setLineDash([4, 8]);
-    ctx.lineWidth = 1.2;
-    ctx.strokeStyle = GRAPHITE;
-    ctx.globalAlpha = ink <= 0 ? 0.12 : (pen ? 0.6 : 0.3);
     ctx.beginPath();
     ctx.arc(drop.x, drop.y, C.DRAW_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = INK;
+    ctx.globalAlpha = isEmpty ? 0 : (pen ? 0.06 : 0.035);
+    ctx.fill();
+    ctx.setLineDash([8 / scale, 7 / scale]);
+    ctx.lineWidth = 2 / scale;
+    ctx.strokeStyle = INK;
+    ctx.globalAlpha = isEmpty ? 0.12 : (pen ? 0.6 : 0.35);
     ctx.stroke();
     ctx.restore();
   }
@@ -1607,6 +1671,27 @@ kbd {
   syncMute();
   renderRanking(-1);
 
+  const canFullscreen = Boolean(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  fullscreenBtn.hidden = !canFullscreen;
+  const isFullscreen = () => Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+  async function toggleFullscreen() {
+    if (!canFullscreen) return;
+    const root = document.documentElement;
+    try {
+      if (isFullscreen()) {
+        await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        await (root.requestFullscreen || root.webkitRequestFullscreen).call(root, { navigationUI: 'hide' });
+        // Android can lock to landscape once fullscreen; everywhere else this quietly fails.
+        await screen.orientation?.lock?.('landscape');
+      }
+    } catch { /* refused by the browser or the frame */ }
+  }
+  const syncFullscreen = () => fullscreenBtn.setAttribute('aria-pressed', String(isFullscreen()));
+  document.addEventListener('fullscreenchange', syncFullscreen);
+  document.addEventListener('webkitfullscreenchange', syncFullscreen);
+  fullscreenBtn.addEventListener('click', () => { fullscreenBtn.blur(); toggleFullscreen(); });
+
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
   window.addEventListener('keydown', (e) => {
     if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1617,7 +1702,8 @@ kbd {
     if (isPauseKey) togglePause();
     else if (isRestartKey && canRestart) restart();
     else if (key === 'm') muteBtn.click();
-    else if (key === 'f') perf.visible = !perf.visible;
+    else if (key === 'f') toggleFullscreen();
+    else if (key === 'd') perf.visible = !perf.visible;
   });
 
   let last = performance.now();

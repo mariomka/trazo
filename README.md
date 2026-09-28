@@ -17,6 +17,9 @@ An endless ink-on-paper browser game. You draw the ground for a little ink drop,
 | `P` / `Esc` | Pause / resume |
 | `R` | Restart |
 | `M` | Mute |
+| `F` | Fullscreen |
+
+On iPhone, which has no fullscreen mode for web pages, use Share → Add to Home Screen to play without the browser bars.
 
 The game is available in English, 中文, Español, العربية, Português, Bahasa Indonesia, Français, 日本語, Русский and Deutsch. It picks your browser's language automatically, and you can force one by adding it to the URL, e.g. `#ja`.
 
