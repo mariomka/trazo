@@ -1,5 +1,7 @@
 # Trazo
 
+![Trazo: an ink drop rolls along a hand-drawn line while an ink blot chases it](og.jpg)
+
 An endless ink-on-paper browser game. You draw the ground for a little ink drop, and it rolls along whatever you draw while a hungry ink blot chases it.
 
 **Play:** https://mariomka.github.io/trazo/
