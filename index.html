@@ -107,6 +107,18 @@ body {
 }
 .overlay button:hover { background: var(--ink); color: var(--paper); }
 .overlay button:focus-visible { outline: 2px dashed var(--ink); outline-offset: 5px; }
+.overlay .ranking-toggle {
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  right: 12px;
+  margin: 0;
+  padding: 6px;
+  font: italic 16px var(--font-text);
+  color: var(--graphite);
+  border: none;
+}
+.overlay .ranking-toggle:hover, .overlay .ranking-toggle[aria-expanded="true"] { background: none; color: var(--ink); }
+.overlay .ranking-toggle:focus-visible { outline-offset: 2px; }
 .overlay .modes { display: flex; gap: 6px; }
 .overlay .modes button {
   margin: 0;
@@ -180,6 +192,7 @@ kbd {
 <div id="stage">
   <canvas id="game" aria-label="Trazo: draw the ground for an ink drop"></canvas>
   <div class="overlay" id="overlay">
+    <button id="rankingToggle" class="ranking-toggle" type="button" aria-expanded="false" aria-controls="rankingBox" hidden>best runs</button>
     <h1 id="headline">Trazo</h1>
     <p id="line1">Draw the ground near the drop. Downhill it gains speed, uphill it loses it.</p>
     <p id="line2">Every stroke feeds the blot. Collect drops to refill your ink.</p>
@@ -269,6 +282,7 @@ kbd {
   const modesEl = document.getElementById('modes');
   const modeButtons = [...modesEl.querySelectorAll('button')];
   const rankingModeEl = document.getElementById('rankingMode');
+  const rankingToggle = document.getElementById('rankingToggle');
   const muteBtn = document.getElementById('mute');
   const fullscreenBtn = document.getElementById('fullscreen');
   const controlsEl = document.getElementById('controls');
@@ -286,6 +300,7 @@ kbd {
       start: 'Start', again: 'Again', resume: 'Resume', pause: 'Paused',
       caught: 'The blot caught you', fell: 'You fell into the void',
       modeNormal: 'normal', modeHard: 'hard',
+      rankingBtn: 'best runs',
       record: 'Best {d}', newRecord: 'New best', hudBest: 'best {d}', meters: '{n} m',
       hint: 'Plays best with your phone in landscape.',
       sound: 'sound', mute: 'Mute', unmute: 'Unmute',
@@ -301,6 +316,7 @@ kbd {
       start: '开始', again: '再来一次', resume: '继续', pause: '暂停',
       caught: '墨团吞没了你', fell: '你掉进了虚空',
       modeNormal: '普通', modeHard: '困难',
+      rankingBtn: '最佳成绩',
       record: '最佳 {d}', newRecord: '新纪录', hudBest: '最佳 {d}', meters: '{n} 米',
       hint: '横屏游玩效果更佳。',
       sound: '声音', mute: '静音', unmute: '开启声音',
@@ -316,6 +332,7 @@ kbd {
       start: 'Empezar', again: 'Otra vez', resume: 'Seguir', pause: 'Pausa',
       caught: 'Te alcanzó la mancha', fell: 'Caíste al vacío',
       modeNormal: 'normal', modeHard: 'difícil',
+      rankingBtn: 'récords',
       record: 'Récord {d}', newRecord: 'Nuevo récord', hudBest: 'récord {d}', meters: '{n} m',
       hint: 'Se juega mejor con el móvil en horizontal.',
       sound: 'sonido', mute: 'Silenciar', unmute: 'Activar sonido',
@@ -331,6 +348,7 @@ kbd {
       start: 'ابدأ', again: 'مرة أخرى', resume: 'تابع', pause: 'إيقاف مؤقت',
       caught: 'التهمتك البقعة', fell: 'سقطت في الفراغ',
       modeNormal: 'عادي', modeHard: 'صعب',
+      rankingBtn: 'أفضل النتائج',
       record: 'أفضل نتيجة {d}', newRecord: 'رقم قياسي جديد', hudBest: 'الأفضل {d}', meters: '{n} م',
       hint: 'اللعب أفضل والهاتف في الوضع الأفقي.',
       sound: 'الصوت', mute: 'كتم الصوت', unmute: 'تشغيل الصوت',
@@ -346,6 +364,7 @@ kbd {
       start: 'Começar', again: 'De novo', resume: 'Continuar', pause: 'Pausa',
       caught: 'A mancha te pegou', fell: 'Você caiu no vazio',
       modeNormal: 'normal', modeHard: 'difícil',
+      rankingBtn: 'recordes',
       record: 'Recorde {d}', newRecord: 'Novo recorde', hudBest: 'recorde {d}', meters: '{n} m',
       hint: 'Fica melhor com o celular na horizontal.',
       sound: 'som', mute: 'Silenciar', unmute: 'Ativar som',
@@ -361,6 +380,7 @@ kbd {
       start: 'Mulai', again: 'Main lagi', resume: 'Lanjut', pause: 'Jeda',
       caught: 'Noda menangkapmu', fell: 'Kamu jatuh ke kehampaan',
       modeNormal: 'normal', modeHard: 'sulit',
+      rankingBtn: 'rekor',
       record: 'Rekor {d}', newRecord: 'Rekor baru', hudBest: 'rekor {d}', meters: '{n} m',
       hint: 'Lebih seru dengan ponsel dalam posisi mendatar.',
       sound: 'suara', mute: 'Bisukan', unmute: 'Nyalakan suara',
@@ -376,6 +396,7 @@ kbd {
       start: 'Jouer', again: 'Rejouer', resume: 'Reprendre', pause: 'Pause',
       caught: 'La tache t’a rattrapé', fell: 'Tu es tombé dans le vide',
       modeNormal: 'normal', modeHard: 'difficile',
+      rankingBtn: 'records',
       record: 'Record {d}', newRecord: 'Nouveau record', hudBest: 'record {d}', meters: '{n} m',
       hint: 'Mieux avec le téléphone à l’horizontale.',
       sound: 'son', mute: 'Couper le son', unmute: 'Activer le son',
@@ -391,6 +412,7 @@ kbd {
       start: 'スタート', again: 'もう一度', resume: '再開', pause: '一時停止',
       caught: 'シミに飲み込まれた', fell: '奈落に落ちた',
       modeNormal: 'ノーマル', modeHard: 'ハード',
+      rankingBtn: '記録',
       record: 'ベスト {d}', newRecord: '新記録', hudBest: 'ベスト {d}', meters: '{n} m',
       hint: 'スマホは横向きがおすすめ。',
       sound: 'サウンド', mute: 'ミュート', unmute: 'サウンドをオン',
@@ -406,6 +428,7 @@ kbd {
       start: 'Начать', again: 'Ещё раз', resume: 'Продолжить', pause: 'Пауза',
       caught: 'Клякса тебя поймала', fell: 'Ты упал в пустоту',
       modeNormal: 'обычный', modeHard: 'сложный',
+      rankingBtn: 'рекорды',
       record: 'Рекорд {d}', newRecord: 'Новый рекорд', hudBest: 'рекорд {d}', meters: '{n} м',
       hint: 'Лучше играть, повернув телефон горизонтально.',
       sound: 'звук', mute: 'Выключить звук', unmute: 'Включить звук',
@@ -421,6 +444,7 @@ kbd {
       start: 'Los', again: 'Nochmal', resume: 'Weiter', pause: 'Pause',
       caught: 'Der Klecks hat dich erwischt', fell: 'Du bist ins Leere gestürzt',
       modeNormal: 'normal', modeHard: 'schwer',
+      rankingBtn: 'Rekorde',
       record: 'Rekord {d}', newRecord: 'Neuer Rekord', hudBest: 'Rekord {d}', meters: '{n} m',
       hint: 'Am besten mit dem Handy im Querformat.',
       sound: 'Ton', mute: 'Stumm', unmute: 'Ton an',
@@ -459,6 +483,7 @@ kbd {
   document.getElementById('line2').textContent = L.line2;
   document.getElementById('hint').textContent = L.hint;
   document.getElementById('rankingTitle').textContent = L.ranking;
+  rankingToggle.textContent = L.rankingBtn;
   document.getElementById('pauseLabel').textContent = L.pauseBtn;
   document.getElementById('restartLabel').textContent = L.restartBtn;
   document.getElementById('fullscreenLabel').textContent = L.fullscreen;
@@ -705,10 +730,14 @@ kbd {
   }
 
   const dateFmt = new Intl.DateTimeFormat(LANG, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  // The title screen keeps the ranking behind a toggle; death screens show it open.
+  let isRankingOpen = false;
   function renderRanking(currentIndex) {
     rankingList.replaceChildren();
     const hasRuns = ranking.length > 0;
-    rankingBox.hidden = !hasRuns;
+    rankingBox.hidden = !(hasRuns && isRankingOpen);
+    rankingToggle.hidden = !(hasRuns && state === 'title');
+    rankingToggle.setAttribute('aria-expanded', String(isRankingOpen));
     const shown = ranking.map((run, i) => ({ run, i })).filter(({ i }) => i < RANKING_SHOWN || i === currentIndex);
     for (const { run, i } of shown) {
       const li = document.createElement('li');
@@ -1697,6 +1726,7 @@ kbd {
 
   // ---------- flow ----------
   function showOverlay(reason, meters, isRecord, rankIndex) {
+    isRankingOpen = true;
     renderRanking(rankIndex);
     headline.textContent = reason === 'caught' ? L.caught : L.fell;
     headline.classList.add('death');
@@ -1746,6 +1776,10 @@ kbd {
   const togglePause = () => { if (state === 'play') pause(); else if (state === 'paused') play(true); };
 
   startBtn.addEventListener('click', () => play(state === 'paused'));
+  rankingToggle.addEventListener('click', () => {
+    isRankingOpen = !isRankingOpen;
+    renderRanking(-1);
+  });
   modesEl.addEventListener('click', (e) => {
     const picked = e.target.closest('button')?.dataset.mode;
     const isChange = picked && picked !== mode;
